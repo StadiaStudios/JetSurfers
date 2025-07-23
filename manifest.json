@@ -1,0 +1,27 @@
+{
+  "name": "JetSurfers",
+  "short_name": "JetSurfers",
+  "description": "Surf Through space, Collect Coins! Buy Upgrades!",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000F",
+  "icons": [
+    {
+      "src": "resources/app-icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "resources/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "resources/app-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "apple touch icon"
+    }
+  ]
+}

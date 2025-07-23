@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JetSurfers</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="icon" type="image/x-icon" href="resources/app-icon.png">
+
+    <!-- Web App Manifest -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- iOS Specific Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="JetSurfers">
+    <!-- You will need to create these icon files in your resources/icons/ directory -->
+    <link rel="apple-touch-icon" sizes="180x180" href="resources/icons/apple-touch-icon-180x180.png">
+    <link rel="apple-touch-icon-precomposed" sizes="180x180" href="resources/icons/apple-touch-icon-180x180.png">
+
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            width: 100vw; /* Make body full width */
+            /* New background image */
+            background-image: url('resources/background.gif');
+            background-size: cover; /* Cover the entire area */
+            background-repeat: no-repeat; /* Do not repeat the image */
+            background-position: center center; /* Center the image */
+            background-attachment: fixed; /* Keep background fixed while content scrolls (though here content is fixed) */
+            font-family: 'Inter', sans-serif;
+            color: #fff;
+            position: relative;
+        }
+
+        /* Removed body::before and body::after for stars */
+
+        .game-container {
+            position: relative;
+            width: 100vw; /* Make game container full width */
+            height: 100vh; /* Make game container full height */
+            background-color: rgba(0, 0, 0, 0.3); /* Slightly transparent dark background for game area */
+            border-radius: 0; /* Remove border-radius for full screen */
+            box-shadow: none; /* Remove shadow for full screen */
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end; /* Align canvas to bottom */
+        }
+
+        canvas {
+            display: block;
+            /* Changed canvas background to be semi-transparent to show GIF */
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 0; /* Remove border-radius for full screen */
+            width: 100%;
+            height: 100%;
+            position: relative; /* Needed for z-index to work */
+            z-index: 16; /* Ensure canvas (and player) is above mobile controls */
+        }
+
+        .score-display {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1.5em;
+            color: #FFD700; /* Gold color for score */
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+            z-index: 10;
+        }
+
+        .coins-display {
+            position: absolute;
+            top: 60px; /* Below score */
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1em;
+            color: #ADFF2F; /* GreenYellow */
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+            z-index: 10;
+        }
+
+        /* Magnet Progress Bar Styles */
+        .magnet-progress-container {
+            position: absolute;
+            top: 100px; /* Below coins display */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 20px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border: 2px solid #00FFFF; /* Aqua border */
+            border-radius: 10px;
+            overflow: hidden;
+            z-index: 10;
+            display: none; /* Hidden by default */
+        }
+
+        .magnet-progress-bar {
+            height: 100%;
+            width: 100%; /* Starts full */
+            background: linear-gradient(to right, #00FFFF, #00BFFF); /* Aqua to DeepSkyBlue gradient */
+            transition: width 0.1s linear; /* Smooth transition for width changes */
+        }
+
+
+        .game-over-screen, .pause-menu, .jet-shop, .settings-menu, .upgrades-store {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            z-index: 20; /* Higher than canvas and controls */
+            border-radius: 0;
+            font-family: 'Press Start 2P', cursive;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+        }
+
+        .game-over-screen.active, .pause-menu.active, .jet-shop.active, .settings-menu.active, .upgrades-store.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .game-over-screen h2, .pause-menu h2, .jet-shop h2, .settings-menu h2, .upgrades-store h2 {
+            font-size: 2.5em;
+            color: #FF4500; /* OrangeRed */
+            margin-bottom: 15px;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.8);
+        }
+
+        .pause-menu h2 {
+            color: #00FFFF; /* Aqua for pause */
+        }
+
+        .jet-shop h2 {
+            color: #FFD700; /* Gold for shop */
+        }
+
+        .settings-menu h2 {
+            color: #8A2BE2; /* BlueViolet for settings */
+        }
+
+        .upgrades-store h2 {
+            color: #FF69B4; /* HotPink for upgrades */
+        }
+
+        .game-over-screen p, .pause-menu p, .settings-menu p, .upgrades-store p {
+            font-size: 1.2em;
+            color: #FFD700;
+            margin-bottom: 30px;
+        }
+
+        .button {
+            background: linear-gradient(to right, #007BFF, #00CFFF); /* Blue gradient */
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.2em;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s, box-shadow 0.2s;
+            font-family: 'Press Start 2P', cursive;
+            text-transform: uppercase;
+            margin: 10px; /* Spacing between buttons */
+        }
+
+        .button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        .button:active {
+            transform: translateY(0);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        #pauseButton {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            z-index: 17; /* Above canvas, below game over/menus */
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Jet Shop specific styles */
+        .jet-list, .upgrade-list {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+            max-width: 90%;
+            overflow-y: auto; /* Allow scrolling if many items */
+            padding: 10px;
+        }
+
+        .jet-card, .upgrade-card {
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 2px solid #FFD700;
+            border-radius: 15px;
+            padding: 15px;
+            width: 150px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+            transition: transform 0.2s;
+        }
+
+        .jet-card.selected {
+            border-color: #00FFFF; /* Aqua border for selected jet */
+            box-shadow: 0 0 20px #00FFFF;
+        }
+
+        .jet-card img, .upgrade-card img {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            background-color: rgba(0, 0, 0, 0.2);
+            padding: 5px;
+        }
+
+        .jet-card h3, .upgrade-card h3 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.9em;
+            color: #fff;
+            margin-bottom: 5px;
+        }
+
+        .jet-card p, .upgrade-card p {
+            font-size: 0.8em;
+            color: #ADFF2F; /* GreenYellow for price */
+            margin-bottom: 10px;
+        }
+
+        .jet-card button, .upgrade-card button {
+            width: 80%;
+            padding: 8px 15px;
+            font-size: 0.8em;
+            margin-top: 5px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            .score-display, .coins-display {
+                font-size: 1em;
+                top: 10px;
+            }
+            .coins-display {
+                top: 40px;
+            }
+            .magnet-progress-container {
+                top: 70px;
+                width: 150px;
+                height: 15px;
+            }
+
+            .game-over-screen h2, .pause-menu h2, .jet-shop h2, .settings-menu h2, .upgrades-store h2 {
+                font-size: 1.8em;
+            }
+
+            .game-over-screen p, .pause-menu p, .settings-menu p, .upgrades-store p {
+                font-size: 0.9em;
+            }
+
+            .button {
+                padding: 10px 20px;
+                font-size: 0.9em;
+                margin: 5px;
+            }
+
+            #pauseButton {
+                padding: 8px 12px;
+                font-size: 0.8em;
+                top: 10px;
+                right: 10px;
+            }
+
+            .jet-card, .upgrade-card {
+                width: 120px;
+                padding: 10px;
+            }
+            .jet-card img, .upgrade-card img {
+                width: 60px;
+                height: 60px;
+            }
+            .jet-card h3, .upgrade-card h3 {
+                font-size: 0.8em;
+            }
+            .jet-card p, .upgrade-card p {
+                font-size: 0.7em;
+            }
+            .jet-card button, .upgrade-card button {
+                padding: 6px 10px;
+                font-size: 0.7em;
+            }
+        }
+
+        /* Confirmation Modal Styles */
+        .confirmation-modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            z-index: 30; /* Higher than other menus */
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+        }
+
+        .confirmation-modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .confirmation-modal-content {
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 2px solid #007BFF; /* Blue border */
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.7);
+            max-width: 80%;
+            font-family: 'Press Start 2P', cursive;
+            color: #fff;
+        }
+
+        .confirmation-modal-content h3 {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            color: #007BFF; /* Blue for heading */
+        }
+
+        .confirmation-modal-buttons {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="score-display" id="scoreDisplay">SCORE: 0</div>
+        <div class="coins-display" id="coinsDisplay">COINS: 0</div>
+        <div class="magnet-progress-container" id="magnetProgressBarContainer">
+            <div class="magnet-progress-bar" id="magnetProgressBar"></div>
+        </div>
+        <button id="pauseButton">PAUSE</button>
+        <canvas id="gameCanvas"></canvas>
+
+        <div class="game-over-screen" id="gameOverScreen">
+            <h2>GAME OVER!</h2>
+            <p>Your Score: <span id="finalScore">0</span></p>
+            <p>Coins Earned: <span id="earnedCoins">0</span></p>
+            <button class="button" id="restartButton">RESTART</button>
+            <button class="button" id="useReviveButton" style="display: none;">USE REVIVE CARD</button>
+        </div>
+
+        <div class="pause-menu" id="pauseMenu">
+            <h2>PAUSED</h2>
+            <button class="button" id="resumeButton">RESUME</button>
+            <button class="button" id="jetShopButton">JET SHOP</button>
+            <button class="button" id="upgradesStoreButton">UPGRADES STORE</button>
+            <button class="button" id="settingsButton">SETTINGS</button>
+        </div>
+
+        <div class="jet-shop" id="jetShop">
+            <h2>JET SHOP</h2>
+            <div class="jet-list" id="jetList">
+                </div>
+            <button class="button" id="backToPauseButton">BACK</button>
+        </div>
+
+        <div class="upgrades-store" id="upgradesStore">
+            <h2>UPGRADES STORE</h2>
+            <div class="upgrade-list" id="upgradeList">
+                <!-- Upgrade cards will be rendered here -->
+            </div>
+            <button class="button" id="backToPauseFromUpgradesButton">BACK</button>
+        </div>
+
+        <div class="settings-menu" id="settingsMenu">
+            <h2>SETTINGS</h2>
+            <p>Version: 1.0.0</p>
+            <p>StadiaStudios</p>
+            <button class="button" id="clearDataButton" style="background: linear-gradient(to right, #DC143C, #FF6347);">CLEAR DATA</button>
+            <button class="button" id="backToPauseFromSettingsButton">BACK</button>
+        </div>
+
+        <!-- Confirmation Modal -->
+        <div class="confirmation-modal" id="confirmationModal">
+            <div class="confirmation-modal-content">
+                <h3>ARE YOU SURE?</h3>
+                <p>This will erase all your game progress!</p>
+                <div class="confirmation-modal-buttons">
+                    <button class="button" id="confirmClearDataButton" style="background: linear-gradient(to right, #007BFF, #00CFFF);">YES</button>
+                    <button class="button" id="cancelClearDataButton" style="background: linear-gradient(to right, #DC143C, #FF6347);">NO</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script type="module">
+        // Get canvas and context
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const coinsDisplay = document.getElementById('coinsDisplay');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const earnedCoinsDisplay = document.getElementById('earnedCoins');
+        const restartButton = document.getElementById('restartButton');
+        const useReviveButton = document.getElementById('useReviveButton'); // New revive button
+        const pauseButton = document.getElementById('pauseButton');
+        const pauseMenu = document.getElementById('pauseMenu');
+        const resumeButton = document.getElementById('resumeButton');
+        const jetShopButton = document.getElementById('jetShopButton');
+        const jetShop = document.getElementById('jetShop');
+        const jetList = document.getElementById('jetList');
+        const backToPauseButton = document.getElementById('backToPauseButton');
+        // New elements for settings menu
+        const settingsButton = document.getElementById('settingsButton');
+        const settingsMenu = document.getElementById('settingsMenu');
+        const backToPauseFromSettingsButton = document.getElementById('backToPauseFromSettingsButton');
+        const clearDataButton = document.getElementById('clearDataButton'); // New: Clear Data Button
+        // New elements for upgrades store
+        const upgradesStoreButton = document.getElementById('upgradesStoreButton');
+        const upgradesStore = document.getElementById('upgradesStore');
+        const upgradeList = document.getElementById('upgradeList');
+        const backToPauseFromUpgradesButton = document.getElementById('backToPauseFromUpgradesButton');
+        // New elements for magnet progress bar
+        const magnetProgressBarContainer = document.getElementById('magnetProgressBarContainer');
+        const magnetProgressBar = document.getElementById('magnetProgressBar');
+        // Confirmation modal elements
+        const confirmationModal = document.getElementById('confirmationModal');
+        const confirmClearDataButton = document.getElementById('confirmClearDataButton');
+        const cancelClearDataButton = document.getElementById('cancelClearDataButton');
+
+
+        // Game variables
+        let player;
+        let obstacles = [];
+        let coinsArray = []; // Array to hold coin objects
+        let magnetsArray = []; // Array to hold magnet objects
+        let score = 0;
+        let coins = 0; // Coins will now be loaded from localStorage
+        let gameSpeed = 3; // Initial speed
+        let gameOver = false;
+        let isPaused = false;
+        let animationFrameId; // To store the requestAnimationFrame ID
+        let hasReviveCard = false; // New variable to track revive card ownership
+        let usedReviveThisRun = false; // New variable to track if revive was used in current run
+        let coinsEarnedThisRun = 0; // Track coins earned in the current game run
+
+        let magnetActive = false; // Is the magnet power-up currently active?
+        let magnetDurationBase = 5000; // Base 5 seconds
+        let magnetDuration = magnetDurationBase; // Actual duration, adjusted by upgrades
+        let magnetStartTime = 0;
+        // Set magnetRadius to cover the entire canvas, dynamically
+        let magnetRadius = Math.max(window.innerWidth, window.innerHeight); 
+        const magnetPullStrength = 5; // Significantly increased pull strength for almost instant collection
+        const magnetSpawnInterval = 15000; // Magnets spawn rarely (15 seconds)
+        let lastMagnetSpawnTime = 0;
+        let magnetDurationLevel = 0; // New: Tracks the level of magnet duration upgrade
+
+
+        // Player properties
+        const playerWidth = 75; // Increased player width
+        const playerHeight = 105; // Increased player height
+        const playerImage = new Image(); // This image object will be updated
+
+        // Obstacle properties
+        const obstacleWidth = 60; // Increased obstacle width
+        const obstacleMinHeight = 45; // Increased obstacle min height
+        const obstacleMaxHeight = 120; // Increased obstacle max height
+        const obstacleColor = '#007BFF'; // Blue obstacle color
+        const obstacleSpawnInterval = 1000; // milliseconds
+        let lastObstacleSpawnTime = 0;
+
+        // Coin properties
+        const coinWidth = 30; // Size of the coin collectible
+        const coinHeight = 30;
+        const coinImage = new Image();
+        coinImage.src = 'resources/coin.gif'; // Coin image URL
+        const coinSpawnInterval = 1500; // milliseconds
+        let lastCoinSpawnTime = 0;
+
+        // Magnet properties
+        const magnetWidth = 40;
+        const magnetHeight = 40;
+        const magnetImage = new Image();
+        magnetImage.src = 'resources/magnet.png'; // Placeholder for magnet image
+
+        // Audio object for coin collection sound
+        const coinSound = new Audio('resources/audio/coin.mp3'); // Public domain coin sound
+        // Audio object for death sound
+        const deathSound = new Audio('resources/audio/dead.2.mp3'); // Public domain death sound
+        // Audio object for magnet collection sound
+        const magnetSound = new Audio('resources/audio/powerup.mp3'); // Placeholder for powerup sound
+
+        // Lane information
+        const numLanes = 3;
+        let laneWidth; // Calculated dynamically
+        let playerLane = Math.floor(numLanes / 2); // Start in middle lane
+
+        // Jet Data (initial default state)
+        const initialJets = [
+            { id: 'jet1', name: 'Default', src: 'resources/jets/default.png', price: 0, owned: true }, // Default jet
+            { id: 'jet2', name: 'Diamond Jet', src: 'resources/jets/diamond-jet.png', price: 1000, owned: false },
+            { id: 'jet3', name: 'Premium Jet', src: 'resources/jets/premium-jet.png', price: 300, owned: false },
+            { id: 'jet4', name: 'Legends Jet', src: 'resources/jets/legends.png', price: 1900, owned: false }
+        ];
+        let jets = [...initialJets]; // Use a mutable copy for game state
+        let currentJetId = 'jet1'; // Default jet will always be selected if no save data
+
+        // Upgrade Data
+        const upgrades = [
+            { id: 'reviveCard', name: 'Repair Kit', description: 'Get one more chance after dying!', src: 'resources/repairkit.png', price: 200, owned: false },
+            { id: 'magnetDuration', name: 'Magnet Duration', description: 'Increases magnet duration by 7s!', src: 'resources/magnet.png', basePrice: 100, priceMultiplier: 1.7, maxLevel: 5 }
+        ];
+
+        // Function to update the player image based on currentJetId
+        function updatePlayerImage() {
+            const selectedJet = jets.find(jet => jet.id === currentJetId);
+            if (selectedJet) {
+                playerImage.src = selectedJet.src;
+                // Ensure the image is loaded before drawing
+                playerImage.onload = () => {
+                    // If player exists, redraw to update immediately
+                    if (player) {
+                        player.draw();
+                    }
+                };
+            }
+        }
+
+        // Function to save game progress to localStorage
+        function saveGame() {
+            const gameData = {
+                coins: coins,
+                jets: jets.map(jet => ({ id: jet.id, owned: jet.owned })), // Only save relevant jet data
+                currentJetId: currentJetId,
+                hasReviveCard: hasReviveCard, // Save revive card status
+                magnetDurationLevel: magnetDurationLevel // Save magnet duration level
+            };
+            localStorage.setItem('endlessRunnerGameData', JSON.stringify(gameData));
+            console.log("Game saved!");
+        }
+
+        // Function to load game progress from localStorage
+        function loadGame() {
+            const savedData = localStorage.getItem('endlessRunnerGameData');
+            if (savedData) {
+                const gameData = JSON.parse(savedData);
+                coins = gameData.coins || 0;
+                currentJetId = gameData.currentJetId || 'jet1';
+                hasReviveCard = gameData.hasReviveCard || false; // Load revive card status
+                magnetDurationLevel = gameData.magnetDurationLevel || 0; // Load magnet duration level
+
+                // Update jet ownership based on loaded data
+                if (gameData.jets) {
+                    jets = initialJets.map(initialJet => {
+                        const savedJet = gameData.jets.find(j => j.id === initialJet.id);
+                        return savedJet ? { ...initialJet, owned: savedJet.owned } : initialJet;
+                    });
+                }
+                // Apply magnet duration upgrade
+                magnetDuration = magnetDurationBase + (magnetDurationLevel * 7000); // 7 seconds per level
+                console.log("Game loaded!");
+            } else {
+                // If no saved data, ensure default jet is owned and selected
+                jets = [...initialJets];
+                jets[0].owned = true; // Ensure the first jet is always owned by default
+                currentJetId = 'jet1';
+                coins = 0;
+                hasReviveCard = false; // No revive card by default
+                magnetDurationLevel = 0; // Reset magnet duration level
+                magnetDuration = magnetDurationBase; // Reset magnet duration
+                console.log("No saved game found, starting new game.");
+            }
+        }
+
+        // Function to resize canvas and update lane width
+        function resizeCanvas() {
+            canvas.width = window.innerWidth; // Use window inner width for full screen
+            canvas.height = window.innerHeight; // Use window inner height for full screen
+            laneWidth = canvas.width / numLanes;
+            // Update magnetRadius on resize
+            magnetRadius = Math.max(canvas.width, canvas.height);
+
+            // Adjust player position if game is not over
+            if (player && !gameOver) {
+                player.x = playerLane * laneWidth + (laneWidth - playerWidth) / 2;
+                player.y = canvas.height - player.height - 10; // Ensure player is at bottom
+            }
+        }
+
+        // Player object
+        class Player {
+            constructor() {
+                this.width = playerWidth;
+                this.height = playerHeight;
+                this.x = playerLane * laneWidth + (laneWidth - this.width) / 2; // Centered in lane
+                this.y = canvas.height - this.height - 10; // Near bottom
+            }
+
+            draw() {
+                ctx.drawImage(playerImage, this.x, this.y, this.width, this.height);
+            }
+
+            move(direction) {
+                if (gameOver || isPaused) return;
+
+                if (direction === 'left' && playerLane > 0) {
+                    playerLane--;
+                } else if (direction === 'right' && playerLane < numLanes - 1) {
+                    playerLane++;
+                }
+                this.x = playerLane * laneWidth + (laneWidth - this.width) / 2;
+            }
+        }
+
+        // Obstacle object
+        class Obstacle {
+            constructor() {
+                this.width = obstacleWidth;
+                this.height = Math.random() * (obstacleMaxHeight - obstacleMinHeight) + obstacleMinHeight;
+                this.lane = Math.floor(Math.random() * numLanes);
+                this.x = this.lane * laneWidth + (laneWidth - this.width) / 2;
+                this.y = -this.height; // Start above canvas
+                this.color = obstacleColor;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                // Add some detail to the obstacle - maybe a glow for space debris
+                ctx.fillStyle = 'rgba(0, 191, 255, 0.5)'; /* DeepSkyBlue glow */
+                ctx.fillRect(this.x + 2, this.y + 2, this.width - 4, this.height - 4);
+            }
+
+            update() {
+                this.y += gameSpeed;
+            }
+        }
+
+        // Coin object
+        class Coin {
+            constructor() {
+                this.width = coinWidth;
+                this.height = coinHeight;
+                // Try to spawn in a lane without an obstacle
+                let attempts = 0;
+                let chosenLane = Math.floor(Math.random() * numLanes);
+                while (attempts < numLanes) { // Try all lanes
+                    const obstacleInLane = obstacles.some(obstacle => 
+                        obstacle.lane === chosenLane && 
+                        obstacle.y < 0 && // Only consider obstacles still spawning or near top
+                        obstacle.y + obstacle.height > -coinHeight // Check if obstacle overlaps with coin spawn area
+                    );
+                    if (!obstacleInLane) {
+                        this.lane = chosenLane;
+                        break;
+                    }
+                    chosenLane = (chosenLane + 1) % numLanes; // Try next lane
+                    attempts++;
+                }
+                this.lane = this.lane !== undefined ? this.lane : Math.floor(Math.random() * numLanes); // Fallback if all lanes have obstacles
+                this.x = this.lane * laneWidth + (laneWidth - this.width) / 2;
+                this.y = -this.height; // Start above canvas
+            }
+
+            draw() {
+                ctx.drawImage(coinImage, this.x, this.y, this.width, this.height);
+            }
+
+            update() {
+                this.y += gameSpeed;
+            }
+        }
+
+        // Magnet object
+        class Magnet {
+            constructor() {
+                this.width = magnetWidth;
+                this.height = magnetHeight;
+                // Try to spawn in a lane without an obstacle
+                let attempts = 0;
+                let chosenLane = Math.floor(Math.random() * numLanes);
+                while (attempts < numLanes) { // Try all lanes
+                    const obstacleInLane = obstacles.some(obstacle => 
+                        obstacle.lane === chosenLane && 
+                        obstacle.y < 0 && // Only consider obstacles still spawning or near top
+                        obstacle.y + obstacle.height > -magnetHeight // Check if obstacle overlaps with magnet spawn area
+                    );
+                    if (!obstacleInLane) {
+                        this.lane = chosenLane;
+                        break;
+                    }
+                    chosenLane = (chosenLane + 1) % numLanes; // Try next lane
+                    attempts++;
+                }
+                this.lane = this.lane !== undefined ? this.lane : Math.floor(Math.random() * numLanes); // Fallback if all lanes have obstacles
+                this.x = this.lane * laneWidth + (laneWidth - this.width) / 2;
+                this.y = -this.height; // Start above canvas
+            }
+
+            draw() {
+                ctx.drawImage(magnetImage, this.x, this.y, this.width, this.height);
+            }
+
+            update() {
+                this.y += gameSpeed;
+            }
+        }
+
+        // Initialize game
+        function initGame() {
+            loadGame(); // Load game data at the start
+            score = 0; // Score always resets on new game
+            coinsEarnedThisRun = 0; // Reset coins earned for the new run
+            gameSpeed = 3;
+            gameOver = false;
+            isPaused = false;
+            obstacles = [];
+            coinsArray = []; // Initialize coins array
+            magnetsArray = []; // Initialize magnets array
+            playerLane = Math.floor(numLanes / 2); // Reset player to middle lane
+            player = new Player();
+            usedReviveThisRun = false; // Reset revive usage for new game
+            magnetActive = false; // Deactivate magnet at start of new game
+            magnetProgressBarContainer.style.display = 'none'; // Hide progress bar at start
+
+            updatePlayerImage(); // Set initial jet image based on currentJetId
+
+            scoreDisplay.textContent = `SCORE: ${score}`;
+            coinsDisplay.textContent = `COINS: ${Math.floor(coins)}`; // Update with loaded coins
+            gameOverScreen.classList.remove('active');
+            pauseMenu.classList.remove('active');
+            jetShop.classList.remove('active');
+            settingsMenu.classList.remove('active'); // Ensure settings menu is hidden
+            upgradesStore.classList.remove('active'); // Ensure upgrades menu is hidden
+            pauseButton.style.display = 'block'; // Show pause button
+            useReviveButton.style.display = 'none'; // Hide revive button at start
+
+            // Clear any existing animation frame and start new one
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+            gameLoop();
+        }
+
+        // Game loop
+        function gameLoop(currentTime) {
+            if (gameOver || isPaused) {
+                cancelAnimationFrame(animationFrameId);
+                return;
+            }
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
+
+            // Update and draw player
+            player.draw();
+
+            // Spawn obstacles
+            if (currentTime - lastObstacleSpawnTime > obstacleSpawnInterval) {
+                obstacles.push(new Obstacle());
+                lastObstacleSpawnTime = currentTime;
+            }
+
+            // Spawn coins
+            if (currentTime - lastCoinSpawnTime > coinSpawnInterval) {
+                coinsArray.push(new Coin());
+                lastCoinSpawnTime = currentTime;
+            }
+
+            // Spawn magnets (only one at a time on screen)
+            if (!magnetActive && magnetsArray.length === 0 && currentTime - lastMagnetSpawnTime > magnetSpawnInterval) {
+                // Introduce a small random chance for magnet to spawn
+                if (Math.random() < 0.2) { // 20% chance to spawn a magnet
+                    magnetsArray.push(new Magnet());
+                    lastMagnetSpawnTime = currentTime;
+                }
+            }
+
+
+            // Update and draw obstacles, check for collision
+            for (let i = 0; i < obstacles.length; i++) {
+                const obstacle = obstacles[i];
+                obstacle.update();
+                obstacle.draw();
+
+                // Collision detection (AABB - Axis-Aligned Bounding Box)
+                if (
+                    player.x < obstacle.x + obstacle.width &&
+                    player.x + player.width > obstacle.x &&
+                    player.y < obstacle.y + obstacle.height &&
+                    player.y + player.height > obstacle.y
+                ) {
+                    endGame();
+                    return;
+                }
+
+                // Remove off-screen obstacles
+                if (obstacle.y > canvas.height) {
+                    obstacles.splice(i, 1);
+                    i--; // Adjust index after removal
+                }
+            }
+
+            // Update and draw magnets, check for collection
+            for (let i = 0; i < magnetsArray.length; i++) {
+                const magnet = magnetsArray[i];
+                magnet.update();
+                magnet.draw();
+
+                // Magnet collection detection
+                if (
+                    player.x < magnet.x + magnet.width &&
+                    player.x + player.width > magnet.x &&
+                    player.y < magnet.y + magnet.height &&
+                    player.y + player.height > magnet.y
+                ) {
+                    magnetActive = true;
+                    magnetStartTime = currentTime;
+                    magnetsArray.splice(i, 1); // Remove collected magnet
+                    i--; // Adjust index after removal
+                    magnetSound.currentTime = 0;
+                    magnetSound.play();
+                    magnetProgressBarContainer.style.display = 'block'; // Show progress bar
+                }
+
+                // Remove off-screen magnets
+                if (magnet.y > canvas.height) {
+                    magnetsArray.splice(i, 1);
+                    i--; // Adjust index after removal
+                }
+            }
+
+
+            // Update and draw coins, check for collection
+            for (let i = 0; i < coinsArray.length; i++) {
+                const coin = coinsArray[i];
+                coin.update();
+                coin.draw();
+
+                // Magnet effect: pull coins towards player
+                if (magnetActive) {
+                    const playerCenterX = player.x + player.width / 2;
+                    const playerCenterY = player.y + player.height / 2;
+                    const coinCenterX = coin.x + coin.width / 2;
+                    const coinCenterY = coin.y + coin.height / 2;
+
+                    const dx = playerCenterX - coinCenterX;
+                    const dy = playerCenterY - coinCenterY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < magnetRadius) {
+                        // Normalize the direction vector
+                        const angle = Math.atan2(dy, dx);
+                        // Make pull speed almost instant by multiplying by a large factor
+                        const moveX = Math.cos(angle) * magnetPullStrength * (magnetRadius - distance) / magnetRadius;
+                        const moveY = Math.sin(angle) * magnetPullStrength * (magnetRadius - distance) / magnetRadius;
+
+                        coin.x += moveX * gameSpeed; // Scale pull strength by game speed
+                        coin.y += moveY * gameSpeed; // Scale pull strength by game speed
+                    }
+                }
+
+                // Coin collection detection (player or magnet pull)
+                if (
+                    player.x < coin.x + coin.width &&
+                    player.x + player.width > coin.x &&
+                    player.y < coin.y + coin.height &&
+                    player.y + player.height > coin.y
+                ) {
+                    coins += 10; // Increase total coins
+                    coinsEarnedThisRun += 10; // Increase coins earned in this run
+                    coinsDisplay.textContent = `COINS: ${Math.floor(coins)}`;
+                    saveGame(); // Save game state after collecting coins
+                    coinsArray.splice(i, 1); // Remove collected coin
+                    i--; // Adjust index after removal
+
+                    // Play coin collection sound
+                    coinSound.currentTime = 0; // Rewind to start
+                    coinSound.play();
+                }
+
+                // Remove off-screen coins
+                if (coin.y > canvas.height) {
+                    coinsArray.splice(i, 1);
+                    i--; // Adjust index after removal
+                }
+            }
+
+            // Check magnet duration and update progress bar
+            if (magnetActive) {
+                const elapsedTime = currentTime - magnetStartTime;
+                const remainingTime = magnetDuration - elapsedTime;
+                const progressPercentage = Math.max(0, (remainingTime / magnetDuration) * 100);
+                magnetProgressBar.style.width = `${progressPercentage}%`;
+
+                if (remainingTime <= 0) {
+                    magnetActive = false;
+                    magnetProgressBarContainer.style.display = 'none'; // Hide progress bar
+                }
+            }
+
+            // Update score
+            score += 0.1; // Increment score over time
+            scoreDisplay.textContent = `SCORE: ${Math.floor(score)}`;
+
+            // Increase game speed gradually
+            gameSpeed += 0.001;
+        }
+
+        // End game
+        function endGame() {
+            gameOver = true;
+            finalScoreDisplay.textContent = Math.floor(score);
+            earnedCoinsDisplay.textContent = Math.floor(coinsEarnedThisRun); // Show coins earned in this run
+            console.log("Coins earned in this run:", Math.floor(coinsEarnedThisRun)); // Log for verification
+            gameOverScreen.classList.add('active');
+            pauseButton.style.display = 'none'; // Hide pause button on game over
+            saveGame(); // Save game state when game ends
+            deathSound.currentTime = 0; // Rewind to start
+            deathSound.play(); // Play death sound
+            magnetProgressBarContainer.style.display = 'none'; // Hide progress bar on game over
+
+            // Show revive button if player has a revive card and hasn't used it this run
+            if (hasReviveCard && !usedReviveThisRun) {
+                useReviveButton.style.display = 'block';
+            } else {
+                useReviveButton.style.display = 'none';
+            }
+        }
+
+        // Use Revive Card
+        function useReviveCard() {
+            if (hasReviveCard && gameOver && !usedReviveThisRun) {
+                hasReviveCard = false; // Consume the card
+                usedReviveThisRun = true; // Mark as used for this run
+                saveGame(); // Save updated card status
+
+                // Reset game state for revive
+                gameOver = false;
+                obstacles = []; // Clear existing obstacles
+                coinsArray = []; // Clear existing coins
+                magnetsArray = []; // Clear existing magnets
+                gameSpeed = 3; // Reset speed
+                playerLane = Math.floor(numLanes / 2); // Reset player position
+                player.x = playerLane * laneWidth + (laneWidth - playerWidth) / 2;
+                player.y = canvas.height - player.height - 10;
+                magnetActive = false; // Deactivate magnet after revive
+                magnetProgressBarContainer.style.display = 'none'; // Hide progress bar after revive
+
+                gameOverScreen.classList.remove('active'); // Hide game over screen
+                pauseButton.style.display = 'block'; // Show pause button
+                useReviveButton.style.display = 'none'; // Hide revive button
+
+                gameLoop(); // Resume game
+            }
+        }
+
+        // Pause/Resume Game
+        function togglePause() {
+            isPaused = !isPaused;
+            if (isPaused) {
+                pauseMenu.classList.add('active');
+                cancelAnimationFrame(animationFrameId); // Stop game loop
+            } else {
+                pauseMenu.classList.remove('active');
+                jetShop.classList.remove('active'); // Hide shop if open
+                settingsMenu.classList.remove('active'); // Hide settings if open
+                upgradesStore.classList.remove('active'); // Hide upgrades if open
+                gameLoop(); // Resume game loop
+            }
+        }
+
+        // Function to clear all game data (now with confirmation)
+        function showClearDataConfirmation() {
+            confirmationModal.classList.add('active');
+        }
+
+        function performClearData() {
+            localStorage.removeItem('endlessRunnerGameData');
+            // Reset all game-related variables to their initial states
+            coins = 0;
+            hasReviveCard = false;
+            magnetDurationLevel = 0;
+            magnetDuration = magnetDurationBase;
+            jets = [...initialJets]; // Reset jets to initial state (only default owned)
+            jets[0].owned = true;
+            currentJetId = 'jet1';
+
+            // Update displays
+            coinsDisplay.textContent = `COINS: ${Math.floor(coins)}`;
+            console.log("All game data cleared!");
+            initGame(); // Reinitialize game to reflect cleared data
+            settingsMenu.classList.remove('active'); // Hide settings menu after clearing data
+            pauseMenu.classList.add('active'); // Go back to pause menu
+            confirmationModal.classList.remove('active'); // Hide confirmation modal
+        }
+
+        function cancelClearData() {
+            confirmationModal.classList.remove('active'); // Hide confirmation modal
+        }
+
+        // Render Jet Shop
+        function renderJetShop() {
+            jetList.innerHTML = ''; // Clear previous jets
+            jets.forEach(jet => {
+                const jetCard = document.createElement('div');
+                jetCard.classList.add('jet-card');
+                if (jet.id === currentJetId) {
+                    jetCard.classList.add('selected');
+                }
+
+                const jetImage = document.createElement('img');
+                jetImage.src = jet.src;
+                jetImage.alt = jet.name;
+
+                const jetName = document.createElement('h3');
+                jetName.textContent = jet.name;
+
+                const jetPrice = document.createElement('p');
+                jetPrice.textContent = jet.owned ? 'OWNED' : `PRICE: ${jet.price} COINS`;
+                jetPrice.style.color = jet.owned ? '#ADFF2F' : '#FFD700'; // Green for owned, gold for price
+
+                const actionButton = document.createElement('button');
+                actionButton.classList.add('button');
+
+                if (jet.owned) {
+                    actionButton.textContent = 'SELECT';
+                    actionButton.style.background = 'linear-gradient(to right, #1E90FF, #6495ED)'; // Blue for select
+                    actionButton.onclick = () => selectJet(jet.id);
+                    if (jet.id === currentJetId) {
+                        actionButton.textContent = 'SELECTED';
+                        actionButton.disabled = true;
+                        actionButton.style.opacity = 0.7;
+                    }
+                } else {
+                    actionButton.textContent = 'BUY';
+                    actionButton.style.background = 'linear-gradient(to right, #007BFF, #00CFFF)'; // Blue for buy
+                    actionButton.onclick = () => buyJet(jet.id);
+                    if (coins < jet.price) {
+                        actionButton.disabled = true;
+                        actionButton.style.opacity = 0.5;
+                    }
+                }
+                
+                jetCard.appendChild(jetImage);
+                jetCard.appendChild(jetName);
+                jetCard.appendChild(jetPrice);
+                jetCard.appendChild(actionButton);
+                jetList.appendChild(jetCard);
+            });
+        }
+
+        // Buy Jet
+        function buyJet(jetId) {
+            const jetToBuy = jets.find(jet => jet.id === jetId);
+            if (jetToBuy && !jetToBuy.owned && coins >= jetToBuy.price) {
+                coins -= jetToBuy.price;
+                jetToBuy.owned = true;
+                coinsDisplay.textContent = `COINS: ${Math.floor(coins)}`;
+                saveGame(); // Save game state after buying a jet
+                renderJetShop(); // Re-render shop to update buttons
+                selectJet(jetId); // Auto-select the bought jet
+            } else if (jetToBuy && coins < jetToBuy.price) {
+                console.log("Not enough coins to buy this jet!");
+            }
+        }
+
+        // Select Jet
+        function selectJet(jetId) {
+            currentJetId = jetId;
+            updatePlayerImage(); // Change the player's visual
+            saveGame(); // Save game state after selecting a jet
+            renderJetShop(); // Re-render shop to update selected state
+        }
+
+        // Render Upgrades Store
+        function renderUpgradesStore() {
+            upgradeList.innerHTML = ''; // Clear previous upgrades
+            upgrades.forEach(upgrade => {
+                const upgradeCard = document.createElement('div');
+                upgradeCard.classList.add('upgrade-card');
+
+                const upgradeImage = document.createElement('img');
+                upgradeImage.src = upgrade.src;
+                upgradeImage.alt = upgrade.name;
+
+                const upgradeName = document.createElement('h3');
+                upgradeName.textContent = upgrade.name;
+
+                const upgradeDescription = document.createElement('p');
+                upgradeDescription.textContent = upgrade.description;
+                upgradeDescription.style.fontSize = '0.7em'; // Smaller font for description
+
+                const upgradePrice = document.createElement('p');
+                const actionButton = document.createElement('button');
+                actionButton.classList.add('button');
+
+                if (upgrade.id === 'reviveCard') {
+                    if (hasReviveCard) {
+                        upgradePrice.textContent = 'OWNED';
+                        upgradePrice.style.color = '#ADFF2F';
+                        actionButton.textContent = 'OWNED';
+                        actionButton.disabled = true;
+                        actionButton.style.opacity = 0.7;
+                        actionButton.style.background = 'linear-gradient(to right, #555, #777)'; // Grey for owned
+                    } else {
+                        upgradePrice.textContent = `PRICE: ${upgrade.price} COINS`;
+                        upgradePrice.style.color = '#FFD700';
+                        actionButton.textContent = 'BUY';
+                        actionButton.style.background = 'linear-gradient(to right, #007BFF, #00CFFF)'; // Blue for buy
+                        actionButton.onclick = () => buyUpgrade(upgrade.id);
+                        if (coins < upgrade.price) {
+                            actionButton.disabled = true;
+                            actionButton.style.opacity = 0.5;
+                        }
+                    }
+                } else if (upgrade.id === 'magnetDuration') {
+                    const currentLevel = magnetDurationLevel;
+                    const maxLevel = upgrade.maxLevel;
+                    const nextPrice = Math.floor(upgrade.basePrice * Math.pow(upgrade.priceMultiplier, currentLevel));
+
+                    if (currentLevel >= maxLevel) {
+                        upgradePrice.textContent = `MAX LEVEL`;
+                        upgradePrice.style.color = '#ADFF2F';
+                        actionButton.textContent = 'MAXED';
+                        actionButton.disabled = true;
+                        actionButton.style.opacity = 0.7;
+                        actionButton.style.background = 'linear-gradient(to right, #555, #777)'; // Grey for maxed
+                    } else {
+                        upgradePrice.textContent = `LEVEL ${currentLevel}/${maxLevel} - PRICE: ${nextPrice} COINS`;
+                        upgradePrice.style.color = '#FFD700';
+                        actionButton.textContent = 'UPGRADE';
+                        actionButton.style.background = 'linear-gradient(to right, #007BFF, #00CFFF)'; // Blue for upgrade
+                        actionButton.onclick = () => buyUpgrade(upgrade.id, nextPrice);
+                        if (coins < nextPrice) {
+                            actionButton.disabled = true;
+                            actionButton.style.opacity = 0.5;
+                        }
+                    }
+                }
+                
+                upgradeCard.appendChild(upgradeImage);
+                upgradeCard.appendChild(upgradeName);
+                upgradeCard.appendChild(upgradeDescription);
+                upgradeCard.appendChild(upgradePrice);
+                upgradeCard.appendChild(actionButton);
+                upgradeList.appendChild(upgradeCard);
+            });
+        }
+
+        // Buy Upgrade
+        function buyUpgrade(upgradeId, price = null) {
+            const upgradeToBuy = upgrades.find(upgrade => upgrade.id === upgradeId);
+            if (!upgradeToBuy) return;
+
+            if (upgradeId === 'reviveCard') {
+                if (!hasReviveCard && coins >= upgradeToBuy.price) {
+                    coins -= upgradeToBuy.price;
+                    hasReviveCard = true; // Player now owns the revive card
+                    coinsDisplay.textContent = `COINS: ${Math.floor(coins)}`;
+                    saveGame(); // Save game state after buying upgrade
+                    renderUpgradesStore(); // Re-render store to update buttons
+                } else if (coins < upgradeToBuy.price) {
+                    console.log("Not enough coins to buy this upgrade!");
+                }
+            } else if (upgradeId === 'magnetDuration') {
+                const currentLevel = magnetDurationLevel;
+                const maxLevel = upgradeToBuy.maxLevel;
+                const actualPrice = price !== null ? price : Math.floor(upgradeToBuy.basePrice * Math.pow(upgradeToBuy.priceMultiplier, currentLevel));
+
+                if (currentLevel < maxLevel && coins >= actualPrice) {
+                    coins -= actualPrice;
+                    magnetDurationLevel++;
+                    magnetDuration = magnetDurationBase + (magnetDurationLevel * 7000); // Increase duration by 7 seconds per level
+                    coinsDisplay.textContent = `COINS: ${Math.floor(coins)}`;
+                    saveGame(); // Save game state after buying upgrade
+                    renderUpgradesStore(); // Re-render store to update buttons
+                } else if (currentLevel >= maxLevel) {
+                    console.log("Magnet Duration is already at max level!");
+                } else if (coins < actualPrice) {
+                    console.log("Not enough coins to buy this upgrade!");
+                }
+            }
+        }
+
+
+        // Event Listeners
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') {
+                player.move('left');
+            } else if (e.key === 'ArrowRight') {
+                player.move('right');
+            } else if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
+                togglePause();
+            }
+        });
+
+        restartButton.addEventListener('click', initGame);
+        useReviveButton.addEventListener('click', useReviveCard); // New event listener for revive button
+        pauseButton.addEventListener('click', togglePause);
+        resumeButton.addEventListener('click', togglePause);
+        jetShopButton.addEventListener('click', () => {
+            pauseMenu.classList.remove('active');
+            jetShop.classList.add('active');
+            renderJetShop(); // Populate the shop when opened
+        });
+        backToPauseButton.addEventListener('click', () => {
+            jetShop.classList.remove('active');
+            pauseMenu.classList.add('active');
+        });
+
+        // New event listeners for settings menu
+        settingsButton.addEventListener('click', () => {
+            pauseMenu.classList.remove('active');
+            settingsMenu.classList.add('active');
+        });
+
+        backToPauseFromSettingsButton.addEventListener('click', () => {
+            settingsMenu.classList.remove('active');
+            pauseMenu.classList.add('active');
+        });
+
+        // Event listener for Clear Data button (now shows confirmation)
+        clearDataButton.addEventListener('click', showClearDataConfirmation);
+        confirmClearDataButton.addEventListener('click', performClearData);
+        cancelClearDataButton.addEventListener('click', cancelClearData);
+
+        // New event listeners for upgrades store
+        upgradesStoreButton.addEventListener('click', () => {
+            pauseMenu.classList.remove('active');
+            upgradesStore.classList.add('active');
+            renderUpgradesStore(); // Populate the upgrades store when opened
+        });
+
+        backToPauseFromUpgradesButton.addEventListener('click', () => {
+            upgradesStore.classList.remove('active');
+            pauseMenu.classList.add('active');
+        });
+
+
+        // Handle window resize
+        window.addEventListener('resize', resizeCanvas);
+
+        // Initial setup on window load
+        window.onload = async function() {
+            resizeCanvas(); // Set initial canvas size
+            initGame(); // Start the game
+        };
+
+        // Swipe controls for mobile
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        canvas.addEventListener('touchstart', (e) => {
+            if (isPaused) return; // Disable swipe when paused
+            touchStartX = e.changedTouches[0].screenX;
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            if (isPaused) return; // Disable swipe when paused
+            touchEndX = e.changedTouches[0].screenX;
+            handleGesture();
+        });
+
+        function handleGesture() {
+            if (touchEndX < touchStartX - 50) { // Swiped left
+                player.move('left');
+            } else if (touchEndX > touchStartX + 50) { // Swiped right
+                player.move('right');
+                }
+        }
+
+    </script>
+</body>
+</html>
