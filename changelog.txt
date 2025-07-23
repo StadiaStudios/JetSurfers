@@ -1,3 +1,9 @@
+V1.2.2 (Project jet Surfer) - - -
+Remove Mobile Mode Toggle, Adjust Player and Obstacle Spawning,
+Refine Obstacle and Coin Spawning Logic, New Golden Jet, Coin Multiplier Upgrade,
+Ability Shop, Fly under obstacles by swiping down or pressing "Down Arrow", New Coin Asset,
+Controls Update: WASD, & Left Shift, Esc to Pause, Controls list in settings,
+
 V1.1.1 (Project jet Surfer) - - -
 Fixes Mobile Layout Bugs, Mobile Mode Settings,
 Speed Multiplies by every 200 Score,
