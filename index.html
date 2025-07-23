@@ -420,8 +420,9 @@
 
         <div class="settings-menu" id="settingsMenu">
             <h2>SETTINGS</h2>
-            <p>Version: 1.0.0</p>
+            <p>Version: 1.1.1</p>
             <p>StadiaStudios</p>
+            <button class="button" id="mobileModeButton">MOBILE MODE: OFF</button> <!-- New Mobile Mode Button -->
             <button class="button" id="clearDataButton" style="background: linear-gradient(to right, #DC143C, #FF6347);">CLEAR DATA</button>
             <button class="button" id="backToPauseFromSettingsButton">BACK</button>
         </div>
@@ -461,6 +462,7 @@
         const settingsMenu = document.getElementById('settingsMenu');
         const backToPauseFromSettingsButton = document.getElementById('backToPauseFromSettingsButton');
         const clearDataButton = document.getElementById('clearDataButton'); // New: Clear Data Button
+        const mobileModeButton = document.getElementById('mobileModeButton'); // New: Mobile Mode Button
         // New elements for upgrades store
         const upgradesStoreButton = document.getElementById('upgradesStoreButton');
         const upgradesStore = document.getElementById('upgradesStore');
@@ -482,7 +484,7 @@
         let magnetsArray = []; // Array to hold magnet objects
         let score = 0;
         let coins = 0; // Coins will now be loaded from localStorage
-        let gameSpeed = 3; // Initial speed
+        let gameSpeed = 3; // Initial speed, reduced for easier start
         let gameOver = false;
         let isPaused = false;
         let animationFrameId; // To store the requestAnimationFrame ID
@@ -495,37 +497,73 @@
         let magnetDuration = magnetDurationBase; // Actual duration, adjusted by upgrades
         let magnetStartTime = 0;
         // Set magnetRadius to cover the entire canvas, dynamically
-        let magnetRadius = Math.max(window.innerWidth, window.innerHeight); 
-        const magnetPullStrength = 5; // Significantly increased pull strength for almost instant collection
+        let magnetRadius; // This will be set dynamically in resizeCanvas
+        const magnetPullStrength = 30; // Significantly increased pull strength for faster collection
         const magnetSpawnInterval = 15000; // Magnets spawn rarely (15 seconds)
         let lastMagnetSpawnTime = 0;
         let magnetDurationLevel = 0; // New: Tracks the level of magnet duration upgrade
 
+        // New variable for speed increase threshold
+        let nextSpeedIncreaseScore = 200;
 
-        // Player properties
-        const playerWidth = 75; // Increased player width
-        const playerHeight = 105; // Increased player height
+        // Mobile Mode State
+        let isMobileMode = false; // Default to false (fixed sizes)
+
+        // Original fixed dimensions for game elements
+        const ORIGINAL_PLAYER_WIDTH = 75;
+        const ORIGINAL_PLAYER_HEIGHT = 105;
+        const ORIGINAL_PLAYER_BOTTOM_OFFSET = 10;
+
+        const ORIGINAL_OBSTACLE_WIDTH = 60;
+        const ORIGINAL_OBSTACLE_MIN_HEIGHT = 45;
+        const ORIGINAL_OBSTACLE_MAX_HEIGHT = 120;
+
+        const ORIGINAL_COIN_WIDTH = 30;
+        const ORIGINAL_COIN_HEIGHT = 30;
+
+        const ORIGINAL_MAGNET_WIDTH = 40;
+        const ORIGINAL_MAGNET_HEIGHT = 40;
+
+        // Responsive Ratios (based on a reference width of 400px and height of 600px for consistency)
+        const PLAYER_WIDTH_RATIO = 0.1875; // 75 / 400
+        const PLAYER_HEIGHT_RATIO = 0.175; // 105 / 600
+        const PLAYER_BOTTOM_OFFSET_RATIO = 0.016; // 10 / 600
+
+        // New responsive ratios for mobile mode to make player smaller
+        const PLAYER_WIDTH_MOBILE_RATIO = 0.1; // Smaller player width for mobile
+        const PLAYER_HEIGHT_MOBILE_RATIO = 0.1; // Smaller player height for mobile
+        const PLAYER_BOTTOM_OFFSET_MOBILE_RATIO = 0.02; // Adjust offset slightly if needed
+
+        const OBSTACLE_WIDTH_RATIO = 0.15; // 60 / 400
+        const OBSTACLE_MIN_HEIGHT_RATIO = 0.075; // 45 / 600
+        const OBSTACLE_MAX_HEIGHT_RATIO = 0.2; // 120 / 600
+
+        const COIN_WIDTH_RATIO = 0.075; // 30 / 400
+        const COIN_HEIGHT_RATIO = 0.05; // 30 / 600
+
+        const MAGNET_WIDTH_RATIO = 0.1; // 40 / 400
+        const MAGNET_HEIGHT_RATIO = 0.066; // 40 / 600
+
+        // Global variables for current dimensions (will be updated by resizeCanvas)
+        let playerWidth, playerHeight, playerBottomOffset;
+        let obstacleWidth, obstacleMinHeight, obstacleMaxHeight;
+        let coinWidth, coinHeight;
+        let magnetWidth, magnetHeight;
+
         const playerImage = new Image(); // This image object will be updated
 
         // Obstacle properties
-        const obstacleWidth = 60; // Increased obstacle width
-        const obstacleMinHeight = 45; // Increased obstacle min height
-        const obstacleMaxHeight = 120; // Increased obstacle max height
         const obstacleColor = '#007BFF'; // Blue obstacle color
         const obstacleSpawnInterval = 1000; // milliseconds
         let lastObstacleSpawnTime = 0;
 
         // Coin properties
-        const coinWidth = 30; // Size of the coin collectible
-        const coinHeight = 30;
         const coinImage = new Image();
         coinImage.src = 'resources/coin.gif'; // Coin image URL
         const coinSpawnInterval = 1500; // milliseconds
         let lastCoinSpawnTime = 0;
 
         // Magnet properties
-        const magnetWidth = 40;
-        const magnetHeight = 40;
         const magnetImage = new Image();
         magnetImage.src = 'resources/magnet.png'; // Placeholder for magnet image
 
@@ -579,7 +617,8 @@
                 jets: jets.map(jet => ({ id: jet.id, owned: jet.owned })), // Only save relevant jet data
                 currentJetId: currentJetId,
                 hasReviveCard: hasReviveCard, // Save revive card status
-                magnetDurationLevel: magnetDurationLevel // Save magnet duration level
+                magnetDurationLevel: magnetDurationLevel, // Save magnet duration level
+                isMobileMode: isMobileMode // Save mobile mode status
             };
             localStorage.setItem('endlessRunnerGameData', JSON.stringify(gameData));
             console.log("Game saved!");
@@ -594,6 +633,7 @@
                 currentJetId = gameData.currentJetId || 'jet1';
                 hasReviveCard = gameData.hasReviveCard || false; // Load revive card status
                 magnetDurationLevel = gameData.magnetDurationLevel || 0; // Load magnet duration level
+                isMobileMode = gameData.isMobileMode !== undefined ? gameData.isMobileMode : false; // Load mobile mode status
 
                 // Update jet ownership based on loaded data
                 if (gameData.jets) {
@@ -614,32 +654,69 @@
                 hasReviveCard = false; // No revive card by default
                 magnetDurationLevel = 0; // Reset magnet duration level
                 magnetDuration = magnetDurationBase; // Reset magnet duration
+                isMobileMode = false; // Default mobile mode to off
                 console.log("No saved game found, starting new game.");
             }
         }
 
-        // Function to resize canvas and update lane width
+        // Function to resize canvas and update lane width and element dimensions
         function resizeCanvas() {
             canvas.width = window.innerWidth; // Use window inner width for full screen
             canvas.height = window.innerHeight; // Use window inner height for full screen
             laneWidth = canvas.width / numLanes;
-            // Update magnetRadius on resize
+
+            // Always update magnetRadius to cover the entire canvas
             magnetRadius = Math.max(canvas.width, canvas.height);
+
+            if (isMobileMode) {
+                // Calculate responsive dimensions for game elements
+                playerWidth = canvas.width * PLAYER_WIDTH_MOBILE_RATIO; // Use mobile specific ratio
+                playerHeight = canvas.height * PLAYER_HEIGHT_MOBILE_RATIO; // Use mobile specific ratio
+                playerBottomOffset = canvas.height * PLAYER_BOTTOM_OFFSET_MOBILE_RATIO; // Use mobile specific ratio
+
+                obstacleWidth = canvas.width * OBSTACLE_WIDTH_RATIO;
+                obstacleMinHeight = canvas.height * OBSTACLE_MIN_HEIGHT_RATIO;
+                obstacleMaxHeight = canvas.height * OBSTACLE_MAX_HEIGHT_RATIO;
+
+                coinWidth = canvas.width * COIN_WIDTH_RATIO;
+                coinHeight = canvas.height * COIN_HEIGHT_RATIO;
+
+                magnetWidth = canvas.width * MAGNET_WIDTH_RATIO;
+                magnetHeight = canvas.height * MAGNET_HEIGHT_RATIO;
+
+            } else {
+                // Use original fixed dimensions
+                playerWidth = ORIGINAL_PLAYER_WIDTH;
+                playerHeight = ORIGINAL_PLAYER_HEIGHT;
+                playerBottomOffset = ORIGINAL_PLAYER_BOTTOM_OFFSET;
+
+                obstacleWidth = ORIGINAL_OBSTACLE_WIDTH;
+                obstacleMinHeight = ORIGINAL_OBSTACLE_MIN_HEIGHT;
+                obstacleMaxHeight = ORIGINAL_OBSTACLE_MAX_HEIGHT;
+
+                coinWidth = ORIGINAL_COIN_WIDTH;
+                coinHeight = ORIGINAL_COIN_HEIGHT;
+
+                magnetWidth = ORIGINAL_MAGNET_WIDTH;
+                magnetHeight = ORIGINAL_MAGNET_HEIGHT;
+            }
 
             // Adjust player position if game is not over
             if (player && !gameOver) {
-                player.x = playerLane * laneWidth + (laneWidth - playerWidth) / 2;
-                player.y = canvas.height - player.height - 10; // Ensure player is at bottom
+                player.width = playerWidth; // Update player object's dimensions
+                player.height = playerHeight;
+                player.x = playerLane * laneWidth + (laneWidth - player.width) / 2;
+                player.y = canvas.height - player.height - playerBottomOffset; // Ensure player is at bottom
             }
         }
 
         // Player object
         class Player {
             constructor() {
-                this.width = playerWidth;
-                this.height = playerHeight;
+                this.width = playerWidth; // Use global responsive value
+                this.height = playerHeight; // Use global responsive value
                 this.x = playerLane * laneWidth + (laneWidth - this.width) / 2; // Centered in lane
-                this.y = canvas.height - this.height - 10; // Near bottom
+                this.y = canvas.height - this.height - playerBottomOffset; // Near bottom, responsive offset
             }
 
             draw() {
@@ -661,8 +738,8 @@
         // Obstacle object
         class Obstacle {
             constructor() {
-                this.width = obstacleWidth;
-                this.height = Math.random() * (obstacleMaxHeight - obstacleMinHeight) + obstacleMinHeight;
+                this.width = obstacleWidth; // Use global responsive value
+                this.height = Math.random() * (obstacleMaxHeight - obstacleMinHeight) + obstacleMinHeight; // Use global responsive values
                 this.lane = Math.floor(Math.random() * numLanes);
                 this.x = this.lane * laneWidth + (laneWidth - this.width) / 2;
                 this.y = -this.height; // Start above canvas
@@ -685,8 +762,8 @@
         // Coin object
         class Coin {
             constructor() {
-                this.width = coinWidth;
-                this.height = coinHeight;
+                this.width = coinWidth; // Use global responsive value
+                this.height = coinHeight; // Use global responsive value
                 // Try to spawn in a lane without an obstacle
                 let attempts = 0;
                 let chosenLane = Math.floor(Math.random() * numLanes);
@@ -720,8 +797,8 @@
         // Magnet object
         class Magnet {
             constructor() {
-                this.width = magnetWidth;
-                this.height = magnetHeight;
+                this.width = magnetWidth; // Use global responsive value
+                this.height = magnetHeight; // Use global responsive value
                 // Try to spawn in a lane without an obstacle
                 let attempts = 0;
                 let chosenLane = Math.floor(Math.random() * numLanes);
@@ -757,14 +834,18 @@
             loadGame(); // Load game data at the start
             score = 0; // Score always resets on new game
             coinsEarnedThisRun = 0; // Reset coins earned for the new run
-            gameSpeed = 3;
+            gameSpeed = 3; // Initial speed, reduced for easier start
             gameOver = false;
             isPaused = false;
             obstacles = [];
             coinsArray = []; // Initialize coins array
             magnetsArray = []; // Initialize magnets array
             playerLane = Math.floor(numLanes / 2); // Reset player to middle lane
-            player = new Player();
+            
+            // Set initial dimensions based on mobile mode state
+            resizeCanvas(); 
+            player = new Player(); // Player is created after dimensions are set by resizeCanvas
+
             usedReviveThisRun = false; // Reset revive usage for new game
             magnetActive = false; // Deactivate magnet at start of new game
             magnetProgressBarContainer.style.display = 'none'; // Hide progress bar at start
@@ -780,6 +861,12 @@
             upgradesStore.classList.remove('active'); // Ensure upgrades menu is hidden
             pauseButton.style.display = 'block'; // Show pause button
             useReviveButton.style.display = 'none'; // Hide revive button at start
+
+            // Update mobile mode button text
+            mobileModeButton.textContent = `MOBILE MODE: ${isMobileMode ? 'ON' : 'OFF'}`;
+
+            // Reset next speed increase score
+            nextSpeedIncreaseScore = 200;
 
             // Clear any existing animation frame and start new one
             if (animationFrameId) {
@@ -884,10 +971,13 @@
                 coin.update();
                 coin.draw();
 
-                // Magnet effect: pull coins towards player
+                // Magnet effect: if magnet is active, pull coins towards the player
                 if (magnetActive) {
+                    // Calculate the center of the player
                     const playerCenterX = player.x + player.width / 2;
                     const playerCenterY = player.y + player.height / 2;
+
+                    // Calculate the center of the coin
                     const coinCenterX = coin.x + coin.width / 2;
                     const coinCenterY = coin.y + coin.height / 2;
 
@@ -895,35 +985,53 @@
                     const dy = playerCenterY - coinCenterY;
                     const distance = Math.sqrt(dx * dx + dy * dy);
 
-                    if (distance < magnetRadius) {
-                        // Normalize the direction vector
-                        const angle = Math.atan2(dy, dx);
-                        // Make pull speed almost instant by multiplying by a large factor
-                        const moveX = Math.cos(angle) * magnetPullStrength * (magnetRadius - distance) / magnetRadius;
-                        const moveY = Math.sin(angle) * magnetPullStrength * (magnetRadius - distance) / magnetRadius;
+                    if (distance > 1) { // Only move if not already on top of the player to prevent jitter
+                        // Calculate normalized direction vector
+                        const nx = dx / distance;
+                        const ny = dy / distance;
 
-                        coin.x += moveX * gameSpeed; // Scale pull strength by game speed
-                        coin.y += moveY * gameSpeed; // Scale pull strength by game speed
+                        // Move coin towards player with pull strength
+                        coin.x += nx * magnetPullStrength;
+                        coin.y += ny * magnetPullStrength;
                     }
-                }
 
-                // Coin collection detection (player or magnet pull)
-                if (
-                    player.x < coin.x + coin.width &&
-                    player.x + player.width > coin.x &&
-                    player.y < coin.y + coin.height &&
-                    player.y + player.height > coin.y
-                ) {
-                    coins += 10; // Increase total coins
-                    coinsEarnedThisRun += 10; // Increase coins earned in this run
-                    coinsDisplay.textContent = `COINS: ${Math.floor(coins)}`;
-                    saveGame(); // Save game state after collecting coins
-                    coinsArray.splice(i, 1); // Remove collected coin
-                    i--; // Adjust index after removal
+                    // Check for collection after moving
+                    if (
+                        player.x < coin.x + coin.width &&
+                        player.x + player.width > coin.x &&
+                        player.y < coin.y + coin.height &&
+                        player.y + player.height > coin.y
+                    ) {
+                        coins += 10; // Increase total coins
+                        coinsEarnedThisRun += 10; // Increase coins earned in this run
+                        coinsDisplay.textContent = `COINS: ${Math.floor(coins)}`;
+                        saveGame(); // Save game state after collecting coins
+                        coinsArray.splice(i, 1); // Remove collected coin
+                        i--; // Adjust index after removal
 
-                    // Play coin collection sound
-                    coinSound.currentTime = 0; // Rewind to start
-                    coinSound.play();
+                        // Play coin collection sound
+                        coinSound.currentTime = 0; // Rewind to start
+                        coinSound.play();
+                    }
+                } else {
+                    // Normal coin collection (without magnet)
+                    if (
+                        player.x < coin.x + coin.width &&
+                        player.x + player.width > coin.x &&
+                        player.y < coin.y + coin.height &&
+                        player.y + player.height > coin.y
+                    ) {
+                        coins += 10; // Increase total coins
+                        coinsEarnedThisRun += 10; // Increase coins earned in this run
+                        coinsDisplay.textContent = `COINS: ${Math.floor(coins)}`;
+                        saveGame(); // Save game state after collecting coins
+                        coinsArray.splice(i, 1); // Remove collected coin
+                        i--; // Adjust index after removal
+
+                        // Play coin collection sound
+                        coinSound.currentTime = 0; // Rewind to start
+                        coinSound.play();
+                    }
                 }
 
                 // Remove off-screen coins
@@ -950,8 +1058,13 @@
             score += 0.1; // Increment score over time
             scoreDisplay.textContent = `SCORE: ${Math.floor(score)}`;
 
-            // Increase game speed gradually
-            gameSpeed += 0.001;
+            // Increase game speed based on score
+            const currentScoreFloor = Math.floor(score);
+            if (currentScoreFloor >= nextSpeedIncreaseScore) {
+                gameSpeed += 0.5; // Increase speed by a fixed amount
+                nextSpeedIncreaseScore += 200; // Set the next threshold
+                console.log(`Speed increased! New speed: ${gameSpeed}`);
+            }
         }
 
         // End game
@@ -987,10 +1100,11 @@
                 obstacles = []; // Clear existing obstacles
                 coinsArray = []; // Clear existing coins
                 magnetsArray = []; // Clear existing magnets
-                gameSpeed = 3; // Reset speed
+                gameSpeed = 3; // Reset speed, consistent with initial speed
                 playerLane = Math.floor(numLanes / 2); // Reset player position
+                // Recalculate player position based on current responsive values
                 player.x = playerLane * laneWidth + (laneWidth - playerWidth) / 2;
-                player.y = canvas.height - player.height - 10;
+                player.y = canvas.height - playerHeight - playerBottomOffset;
                 magnetActive = false; // Deactivate magnet after revive
                 magnetProgressBarContainer.style.display = 'none'; // Hide progress bar after revive
 
@@ -1032,6 +1146,7 @@
             jets = [...initialJets]; // Reset jets to initial state (only default owned)
             jets[0].owned = true;
             currentJetId = 'jet1';
+            isMobileMode = false; // Reset mobile mode to default off
 
             // Update displays
             coinsDisplay.textContent = `COINS: ${Math.floor(coins)}`;
@@ -1045,6 +1160,19 @@
         function cancelClearData() {
             confirmationModal.classList.remove('active'); // Hide confirmation modal
         }
+
+        // Toggle Mobile Mode
+        function toggleMobileMode() {
+            isMobileMode = !isMobileMode;
+            mobileModeButton.textContent = `MOBILE MODE: ${isMobileMode ? 'ON' : 'OFF'}`;
+            saveGame(); // Save the new mobile mode state
+            resizeCanvas(); // Re-apply dimensions based on new mobile mode state
+            // If the game is running, we need to re-instantiate player to apply new dimensions
+            if (!gameOver && !isPaused) {
+                player = new Player();
+            }
+        }
+
 
         // Render Jet Shop
         function renderJetShop() {
@@ -1272,6 +1400,9 @@
         confirmClearDataButton.addEventListener('click', performClearData);
         cancelClearDataButton.addEventListener('click', cancelClearData);
 
+        // New event listener for Mobile Mode button
+        mobileModeButton.addEventListener('click', toggleMobileMode);
+
         // New event listeners for upgrades store
         upgradesStoreButton.addEventListener('click', () => {
             pauseMenu.classList.remove('active');
@@ -1290,7 +1421,7 @@
 
         // Initial setup on window load
         window.onload = async function() {
-            resizeCanvas(); // Set initial canvas size
+            resizeCanvas(); // Set initial canvas size and responsive element dimensions
             initGame(); // Start the game
         };
 
@@ -1307,8 +1438,8 @@
             if (isPaused) return; // Disable swipe when paused
             touchEndX = e.changedTouches[0].screenX;
             handleGesture();
-        });
-
+        }); 
+        
         function handleGesture() {
             if (touchEndX < touchStartX - 50) { // Swiped left
                 player.move('left');
