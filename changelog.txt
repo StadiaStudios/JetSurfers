@@ -1,3 +1,6 @@
+V1.3.2 (Project jet Surfer) - - -
+Classic Green Theme, JetPack Ability, Money Wrap Jet,
+
 V1.2.2 (Project jet Surfer) - - -
 Remove Mobile Mode Toggle, Adjust Player and Obstacle Spawning,
 Refine Obstacle and Coin Spawning Logic, New Golden Jet, Coin Multiplier Upgrade,

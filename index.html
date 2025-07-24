@@ -77,7 +77,7 @@
             transform: translateX(-50%);
             font-family: 'Press Start 2P', cursive;
             font-size: 1.5em;
-            color: #FFD700; /* Gold color for score */
+            color: #ff0000; /* Gold color for score */
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
             z-index: 10;
         }
@@ -89,13 +89,13 @@
             transform: translateX(-50%);
             font-family: 'Press Start 2P', cursive;
             font-size: 1em;
-            color: #ADFF2F; /* GreenYellow */
+            color: #ff2f2f; /* GreenYellow */
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
             z-index: 10;
         }
 
         /* Magnet Progress Bar Styles */
-        .magnet-progress-container {
+        .magnet-progress-container, .jetpack-progress-container {
             position: absolute;
             top: 100px; /* Below coins display */
             left: 50%;
@@ -103,7 +103,7 @@
             width: 200px;
             height: 20px;
             background-color: rgba(0, 0, 0, 0.5);
-            border: 2px solid #00FFFF; /* Aqua border */
+            border: 2px solid #ff1e00; /* Aqua border */
             border-radius: 10px;
             overflow: hidden;
             z-index: 10;
@@ -113,7 +113,19 @@
         .magnet-progress-bar {
             height: 100%;
             width: 100%; /* Starts full */
-            background: linear-gradient(to right, #d0ff00, #00BFFF); /* Aqua to DeepSkyBlue gradient */
+            background: linear-gradient(to right, #660000, #ff0000); /* Aqua to DeepSkyBlue gradient */
+            transition: width 0.1s linear; /* Smooth transition for width changes */
+        }
+
+        .jetpack-progress-container {
+            top: 130px; /* Below magnet progress bar */
+            border: 2px solid #00FFFF; /* Aqua border for jetpack */
+        }
+
+        .jetpack-progress-bar {
+            height: 100%;
+            width: 100%; /* Starts full */
+            background: linear-gradient(to right, #b9ad00, #131313); /* Aqua to Blue gradient */
             transition: width 0.1s linear; /* Smooth transition for width changes */
         }
 
@@ -177,7 +189,7 @@
         }
 
         .button {
-            background: linear-gradient(to right, #007BFF, #00CFFF); /* Blue gradient */
+            background: linear-gradient(to right, #2E8B57, #3CB371); /* Blue gradient */
             color: white;
             padding: 15px 30px;
             border: none;
@@ -199,6 +211,19 @@
         .button:active {
             transform: translateY(0);
             box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        /* New style for pause menu buttons */
+        .pause-menu .button {
+            background: linear-gradient(to right, #2E8B57, #3CB371); /* Light greenish gradient */
+            border: 2px solid #90EE90; /* Lighter green border */
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .pause-menu .button:hover {
+            background: linear-gradient(to right, #3CB371, #2E8B57); /* Reverse gradient on hover */
+            box-shadow: 0 8px 20px rgba(0, 255, 0, 0.4); /* Green glow on hover */
         }
 
         #pauseButton {
@@ -286,10 +311,13 @@
             .coins-display {
                 top: 40px;
             }
-            .magnet-progress-container {
+            .magnet-progress-container, .jetpack-progress-container {
                 top: 70px;
                 width: 150px;
                 height: 15px;
+            }
+            .jetpack-progress-container {
+                top: 90px;
             }
 
             .game-over-screen h2, .pause-menu h2, .jet-shop h2, .settings-menu h2, .upgrades-store h2, .ability-shop h2 {
@@ -434,6 +462,9 @@
         <div class="magnet-progress-container" id="magnetProgressBarContainer">
             <div class="magnet-progress-bar" id="magnetProgressBar"></div>
         </div>
+        <div class="jetpack-progress-container" id="jetpackProgressBarContainer">
+            <div class="jetpack-progress-bar" id="jetpackProgressBar"></div>
+        </div>
         <button id="pauseButton">PAUSE</button>
         <canvas id="gameCanvas"></canvas>
 
@@ -479,7 +510,7 @@
 
         <div class="settings-menu" id="settingsMenu">
             <h2>SETTINGS</h2>
-            <p>Version: 1.2.2</p>
+            <p>Version: 1.3.2</p>
             <p>StadiaStudios</p>
             <button class="button" id="controlsButton">CONTROLS</button> <!-- New button -->
             <div id="controlsDisplay" class="controls-display"> <!-- New controls display area -->
@@ -537,6 +568,9 @@
         // New elements for magnet progress bar
         const magnetProgressBarContainer = document.getElementById('magnetProgressBarContainer');
         const magnetProgressBar = document.getElementById('magnetProgressBar');
+        // New elements for jetpack progress bar
+        const jetpackProgressBarContainer = document.getElementById('jetpackProgressBarContainer');
+        const jetpackProgressBar = document.getElementById('jetpackProgressBar');
         // Confirmation modal elements
         const confirmationModal = document.getElementById('confirmationModal');
         const confirmClearDataButton = document.getElementById('confirmClearDataButton');
@@ -557,6 +591,7 @@
         let obstacles = [];
         let coinsArray = []; // Array to hold coin objects
         let magnetsArray = []; // Array to hold magnet objects
+        let jetpacksArray = []; // Array to hold jetpack objects (NEW)
         let score = 0;
         let coins = 0; // Coins will now be loaded from localStorage
         let gameSpeed = 3; // Initial speed, reduced for easier start
@@ -578,6 +613,17 @@
         let lastMagnetSpawnTime = 0;
         let magnetDurationLevel = 0; // New: Tracks the level of magnet duration upgrade
         let coinDoublerLevel = 0; // New: Tracks the level of coin doubler upgrade
+
+        // Jetpack variables (NEW)
+        let jetpackActive = false;
+        const jetpackDuration = 7000; // 7 seconds duration
+        let jetpackStartTime = 0;
+        const jetpackSpawnInterval = 30000; // Jetpacks spawn very rarely (30 seconds)
+        let lastJetpackSpawnTime = 0;
+        const jetpackSpeedBoost = 20; // Additional speed when jetpack is active
+        let originalGameSpeed = gameSpeed; // To store gameSpeed before jetpack activation
+        let jetpackCollectedCoins = false; // Flag to collect all coins on screen
+        let jetpackNoCollision = false; // Flag for temporary invincibility
 
         // New variable for speed increase threshold
         let nextSpeedIncreaseScore = 200;
@@ -606,16 +652,20 @@
         const MAGNET_WIDTH = 40;
         const MAGNET_HEIGHT = 40;
 
+        const JETPACK_WIDTH = 50; // NEW: Jetpack dimensions
+        const JETPACK_HEIGHT = 50; // NEW: Jetpack dimensions
+
         // Global variables for current dimensions (will be updated by resizeCanvas)
         let playerWidth, playerHeight, playerBottomOffset;
         let obstacleWidth, obstacleMinHeight, obstacleMaxHeight;
         let coinWidth, coinHeight;
         let magnetWidth, magnetHeight;
+        let jetpackWidth, jetpackHeight; // NEW: Jetpack dimensions
 
         const playerImage = new Image(); // This image object will be updated
 
         // Obstacle properties
-        const obstacleColor = '#007BFF'; // Blue obstacle color
+        const obstacleColor = '#FF0000'; // Red obstacle color
         const obstacleSpawnInterval = 1000; // milliseconds
         let lastObstacleSpawnTime = 0;
 
@@ -629,6 +679,10 @@
         const magnetImage = new Image();
         magnetImage.src = 'resources/magnet.png'; // Placeholder for magnet image
 
+        // Jetpack properties (NEW)
+        const jetpackImage = new Image();
+        jetpackImage.src = 'resources/jetpack.png'; // Placeholder for jetpack image
+
         // Audio object for coin collection sound
         const coinSound = new Audio('resources/audio/coin.mp3'); // Public domain coin sound
         // Audio object for death sound
@@ -637,6 +691,8 @@
         const magnetSound = new Audio('resources/audio/powerup.mp3'); // Placeholder for powerup sound
         // Audio object for fly through sound
         const flyThroughSound = new Audio('resources/audio/whoosh.mp3'); // Placeholder for whoosh sound
+        // Audio object for jetpack sound (NEW)
+        const jetpackSound = new Audio('resources/audio/jetpack.mp3'); // Placeholder for jetpack sound
 
         // Lane information
         const numLanes = 3;
@@ -646,10 +702,11 @@
         // Jet Data (initial default state)
         const initialJets = [
             { id: 'jet1', name: 'Default', src: 'resources/jets/default.png', price: 0, owned: true }, // Default jet
-            { id: 'jet2', name: 'Diamond Jet', src: 'resources/jets/diamond-jet.png', price: 1000, owned: false },
             { id: 'jet3', name: 'Premium Jet', src: 'resources/jets/premium-jet.png', price: 300, owned: false },
+            { id: 'jet2', name: 'Diamond Jet', src: 'resources/jets/diamond-jet.png', price: 1000, owned: false },
             { id: 'jet4', name: 'Legends Jet', src: 'resources/jets/legends.png', price: 1900, owned: false },
-            { id: 'jet5', name: 'Golden Jet', src: 'resources/jets/golden-jet.png', price: 2500, owned: false } // New Golden Jet
+            { id: 'jet5', name: 'Golden Jet', src: 'resources/jets/golden-jet.png', price: 2500, owned: false }, // Golden Jet
+            { id: 'jet6', name: 'Benjamin', src: 'resources/jets/benjamin-jet.png', price: 3500, owned: false } // New Jet
         ];
         let jets = [...initialJets]; // Use a mutable copy for game state
 
@@ -664,7 +721,8 @@
 
         // Ability Data (New)
         const initialAbilities = [
-            { id: 'flyThrough', name: 'Under Power', description: 'Temporarily go under obstacles!', src: 'resources/flyunder.png', price: 3000, owned: false }
+            { id: 'flyThrough', name: 'Under Power', description: 'Temporarily go under obstacles!', src: 'resources/flyunder.png', price: 3000, owned: false },
+            { id: 'jetpackAbility', name: 'JetPack', description: 'Unleash the power of the JetPack!', src: 'resources/jetpack.png', price: 1000, owned: false } // New Jetpack ability
         ];
         let gameAbilities = [...initialAbilities]; // Use a mutable copy for game state
 
@@ -759,13 +817,16 @@
 
             obstacleWidth = OBSTACLE_WIDTH;
             obstacleMinHeight = OBSTACLE_MIN_HEIGHT;
-            obstacleMaxHeight = OBSTACLE_MAX_HEIGHT;
+            obstacleMaxHeight = 120;
 
             coinWidth = COIN_WIDTH;
             coinHeight = COIN_HEIGHT;
 
             magnetWidth = MAGNET_WIDTH;
             magnetHeight = MAGNET_HEIGHT;
+
+            jetpackWidth = JETPACK_WIDTH; // NEW
+            jetpackHeight = JETPACK_HEIGHT; // NEW
 
             // Adjust player position if game is not over
             if (player && !gameOver) {
@@ -791,6 +852,11 @@
                 if (this.isFlyingThrough) {
                     ctx.globalAlpha = 0.5; // Make player semi-transparent
                     ctx.translate(0, 10); // Move player slightly down for "go under" effect
+                }
+                // If jetpack is active, make player glow
+                if (jetpackActive) {
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = "cyan"; // Cyan glow for jetpack
                 }
                 ctx.drawImage(playerImage, this.x, this.y, this.width, this.height);
                 ctx.restore(); // Restore the canvas state
@@ -845,7 +911,7 @@
                 ctx.fillStyle = this.color;
                 ctx.fillRect(this.x, this.y, this.width, this.height);
                 // Add some detail to the obstacle - maybe a glow for space debris
-                ctx.fillStyle = 'rgba(0, 191, 255, 0.5)'; /* DeepSkyBlue glow */
+                ctx.fillStyle = 'darkred'; /* Changed glow to darkred for a fiery effect */
                 ctx.fillRect(this.x + 2, this.y + 2, this.width - 4, this.height - 4);
             }
 
@@ -924,6 +990,40 @@
             }
         }
 
+        // Jetpack object (NEW)
+        class Jetpack {
+            constructor() {
+                this.width = jetpackWidth;
+                this.height = jetpackHeight;
+                let attempts = 0;
+                let chosenLane = Math.floor(Math.random() * numLanes);
+                while (attempts < numLanes) {
+                    const obstacleInLane = obstacles.some(obstacle => 
+                        obstacle.lane === chosenLane && 
+                        obstacle.y < 0 &&
+                        obstacle.y + obstacle.height > -jetpackHeight
+                    );
+                    if (!obstacleInLane) {
+                        this.lane = chosenLane;
+                        break;
+                    }
+                    chosenLane = (chosenLane + 1) % numLanes;
+                    attempts++;
+                }
+                this.lane = this.lane !== undefined ? this.lane : Math.floor(Math.random() * numLanes);
+                this.x = this.lane * laneWidth + (laneWidth - this.width) / 2;
+                this.y = -this.height;
+            }
+
+            draw() {
+                ctx.drawImage(jetpackImage, this.x, this.y, this.width, this.height);
+            }
+
+            update() {
+                this.y += gameSpeed;
+            }
+        }
+
         // Initialize game
         function initGame() {
             loadGame(); // Load game data at the start
@@ -935,6 +1035,7 @@
             obstacles = [];
             coinsArray = []; // Initialize coins array
             magnetsArray = []; // Initialize magnets array
+            jetpacksArray = []; // Initialize jetpacks array (NEW)
             playerLane = Math.floor(numLanes / 2); // Reset player to middle lane
             
             // Set initial dimensions (no more mobile mode state affecting this)
@@ -944,6 +1045,11 @@
             usedReviveThisRun = false; // Reset revive usage for new game
             magnetActive = false; // Deactivate magnet at start of new game
             magnetProgressBarContainer.style.display = 'none'; // Hide progress bar at start
+            jetpackActive = false; // Deactivate jetpack at start of new game (NEW)
+            jetpackProgressBarContainer.style.display = 'none'; // Hide jetpack progress bar at start (NEW)
+            jetpackCollectedCoins = false; // Reset jetpack coin collection (NEW)
+            jetpackNoCollision = false; // Reset jetpack invincibility (NEW)
+            
             isFlyingThrough = false; // Reset fly through state
             lastFlyThroughTime = 0; // Reset fly through cooldown
 
@@ -1007,6 +1113,15 @@
                 }
             }
 
+            // Spawn jetpacks (NEW - very rare, only one at a time)
+            const jetpackAbility = gameAbilities.find(a => a.id === 'jetpackAbility');
+            if (jetpackAbility && jetpackAbility.owned && !jetpackActive && jetpacksArray.length === 0 && currentTime - lastJetpackSpawnTime > jetpackSpawnInterval) {
+                if (Math.random() < 0.1) { // 10% chance for jetpack to spawn (even rarer)
+                    jetpacksArray.push(new Jetpack());
+                    lastJetpackSpawnTime = currentTime;
+                }
+            }
+
 
             // Update and draw obstacles, check for collision
             for (let i = 0; i < obstacles.length; i++) {
@@ -1021,8 +1136,8 @@
                     player.y < obstacle.y + obstacle.height &&
                     player.y + player.height > obstacle.y
                 ) {
-                    // If player is flying through, bypass collision
-                    if (player.isFlyingThrough) {
+                    // If player is flying through or has jetpack active, bypass collision
+                    if (player.isFlyingThrough || jetpackNoCollision) { // MODIFIED: Added jetpackNoCollision
                         // Optionally, play a sound or show a visual effect for successful fly-through
                         // For now, just continue to the next obstacle, effectively ignoring collision
                         continue; 
@@ -1067,6 +1182,39 @@
                 }
             }
 
+            // Update and draw jetpacks, check for collection (NEW)
+            for (let i = 0; i < jetpacksArray.length; i++) {
+                const jetpack = jetpacksArray[i];
+                jetpack.update();
+                jetpack.draw();
+
+                // Jetpack collection detection
+                if (
+                    player.x < jetpack.x + jetpack.width &&
+                    player.x + player.width > jetpack.x &&
+                    player.y < jetpack.y + jetpack.height &&
+                    player.y + player.height > jetpack.y
+                ) {
+                    jetpackActive = true;
+                    jetpackStartTime = currentTime;
+                    originalGameSpeed = gameSpeed; // Store current game speed
+                    gameSpeed += jetpackSpeedBoost; // Increase game speed
+                    jetpackCollectedCoins = true; // Activate coin collection
+                    jetpackNoCollision = true; // Activate no collision
+                    jetpacksArray.splice(i, 1); // Remove collected jetpack
+                    i--; // Adjust index after removal
+                    jetpackSound.currentTime = 0;
+                    jetpackSound.play();
+                    jetpackProgressBarContainer.style.display = 'block'; // Show progress bar
+                }
+
+                // Remove off-screen jetpacks
+                if (jetpack.y > canvas.height) {
+                    jetpacksArray.splice(i, 1);
+                    i--; // Adjust index after removal
+                }
+            }
+
 
             // Update and draw coins, check for collection
             for (let i = 0; i < coinsArray.length; i++) {
@@ -1075,10 +1223,26 @@
                 coin.draw();
 
                 // Calculate coins to add based on upgrade level
-                const coinsToAdd = 10 + (coinDoublerLevel * 3);
+                let coinsToAdd = 10 + (coinDoublerLevel * 3);
 
                 // Magnet effect: if magnet is active, pull coins towards the player
-                if (magnetActive) {
+                // Jetpack effect: if jetpack is active, collect all coins instantly
+                if (magnetActive || jetpackCollectedCoins) { // MODIFIED: Added jetpackCollectedCoins
+                    // If jetpack is active, collect instantly
+                    if (jetpackCollectedCoins) {
+                        coinsToAdd *= 2; // Double coins when jetpack is active (NEW)
+                        coins += coinsToAdd; // Increase total coins
+                        coinsEarnedThisRun += coinsToAdd; // Increase coins earned in this run
+                        coinsDisplay.textContent = `COINS: ${Math.floor(coins)}`;
+                        saveGame(); // Save game state after collecting coins
+                        coinsArray.splice(i, 1); // Remove collected coin
+                        i--; // Adjust index after removal
+                        coinSound.currentTime = 0; // Rewind to start
+                        coinSound.play();
+                        continue; // Move to next coin
+                    }
+
+                    // Magnet logic (only if jetpack is not active)
                     // Calculate the center of the player
                     const playerCenterX = player.x + player.width / 2;
                     const playerCenterY = player.y + player.height / 2;
@@ -1120,7 +1284,7 @@
                         coinSound.play();
                     }
                 } else {
-                    // Normal coin collection (without magnet)
+                    // Normal coin collection (without magnet or jetpack)
                     if (
                         player.x < coin.x + coin.width &&
                         player.x + player.width > coin.x &&
@@ -1160,8 +1324,28 @@
                 }
             }
 
+            // Check jetpack duration and update progress bar (NEW)
+            if (jetpackActive) {
+                const elapsedTime = currentTime - jetpackStartTime;
+                const remainingTime = jetpackDuration - elapsedTime;
+                const progressPercentage = Math.max(0, (remainingTime / jetpackDuration) * 100);
+                jetpackProgressBar.style.width = `${progressPercentage}%`;
+
+                if (remainingTime <= 0) {
+                    jetpackActive = false;
+                    gameSpeed = originalGameSpeed; // Restore original game speed
+                    jetpackCollectedCoins = false; // Deactivate coin collection
+                    jetpackNoCollision = false; // Deactivate no collision
+                    jetpackProgressBarContainer.style.display = 'none'; // Hide progress bar
+                }
+            }
+
             // Update score
-            score += 0.1; // Increment score over time
+            if (jetpackActive) {
+                score += 0.1 * 5; // Score goes 5x faster when jetpack is active
+            } else {
+                score += 0.1; // Increment score over time
+            }
             scoreDisplay.textContent = `SCORE: ${Math.floor(score)}`;
 
             // Increase game speed based on score
@@ -1185,6 +1369,11 @@
             deathSound.currentTime = 0; // Rewind to start
             deathSound.play(); // Play death sound
             magnetProgressBarContainer.style.display = 'none'; // Hide progress bar on game over
+            jetpackProgressBarContainer.style.display = 'none'; // Hide jetpack progress bar on game over (NEW)
+            jetpackActive = false; // Ensure jetpack is off (NEW)
+            gameSpeed = originalGameSpeed; // Reset game speed (NEW)
+            jetpackCollectedCoins = false; // Reset jetpack coin collection (NEW)
+            jetpackNoCollision = false; // Reset jetpack invincibility (NEW)
             isFlyingThrough = false; // Ensure fly through is off on game over
 
             // Show revive button if player has a revive card and hasn't used it this run
@@ -1207,6 +1396,7 @@
                 obstacles = []; // Clear existing obstacles
                 coinsArray = []; // Clear existing coins
                 magnetsArray = []; // Clear existing magnets
+                jetpacksArray = []; // Clear existing jetpacks (NEW)
                 gameSpeed = 3; // Reset speed, consistent with initial speed
                 playerLane = Math.floor(numLanes / 2); // Reset player position
                 // Recalculate player position based on current responsive values
@@ -1214,6 +1404,10 @@
                 player.y = canvas.height - playerHeight - playerBottomOffset;
                 magnetActive = false; // Deactivate magnet after revive
                 magnetProgressBarContainer.style.display = 'none'; // Hide progress bar after revive
+                jetpackActive = false; // Deactivate jetpack after revive (NEW)
+                jetpackProgressBarContainer.style.display = 'none'; // Hide jetpack progress bar after revive (NEW)
+                jetpackCollectedCoins = false; // Reset jetpack coin collection (NEW)
+                jetpackNoCollision = false; // Reset jetpack invincibility (NEW)
                 isFlyingThrough = false; // Reset fly through state after revive
                 lastFlyThroughTime = 0; // Reset fly through cooldown after revive
 
